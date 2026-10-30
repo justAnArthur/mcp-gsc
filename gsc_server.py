@@ -37,6 +37,7 @@ logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)
 
 # MCP
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
 mcp = FastMCP("gsc-server")
 
@@ -103,7 +104,16 @@ if _raw_data_state not in ("all", "final"):
     )
 DATA_STATE = _raw_data_state
 
-SCOPES = ["https://www.googleapis.com/auth/webmasters"]
+# GSC_READ_ONLY=true asks Google for the read-only scope, so every write is refused there,
+# whatever the user's role. Read tools carry readOnlyHint so clients can hide the rest.
+READ_ONLY_MODE = os.environ.get("GSC_READ_ONLY", "false").lower() in ("true", "1", "yes")
+READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
+
+SCOPES = [
+    "https://www.googleapis.com/auth/webmasters.readonly"
+    if READ_ONLY_MODE
+    else "https://www.googleapis.com/auth/webmasters"
+]
 
 def get_gsc_service():
     """
@@ -249,7 +259,7 @@ def _site_not_found_error(site_url: str) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_capabilities() -> str:
     """
     Get a full list of all available tools, current auth status, and how to get started.
@@ -306,7 +316,7 @@ Destructive (disabled by default, set GSC_ALLOW_DESTRUCTIVE=true to enable):
 """
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def list_properties() -> str:
     """
     List all Google Search Console (GSC) properties and sites the user has access to.
@@ -460,7 +470,7 @@ async def delete_site(site_url: str) -> str:
     except Exception as e:
         return f"Error removing site: {str(e)}"
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_search_analytics(site_url: str, days: int = 28, dimensions: str = "query", row_limit: int = 20) -> str:
     """
     Get search analytics data for a specific property.
@@ -528,7 +538,7 @@ async def get_search_analytics(site_url: str, days: int = 28, dimensions: str = 
             return _site_not_found_error(site_url)
         return f"Error retrieving search analytics: {str(e)}"
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_site_details(site_url: str) -> str:
     """
     Get detailed information about a specific Search Console property.
@@ -568,7 +578,7 @@ async def get_site_details(site_url: str) -> str:
     except Exception as e:
         return f"Error retrieving site details: {str(e)}"
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_sitemaps(site_url: str) -> str:
     """
     List all sitemaps for a specific Search Console property.
@@ -665,7 +675,7 @@ def _rich_results_summary(inspection: Dict[str, Any]) -> Optional[Dict[str, Any]
         ],
     }
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def inspect_url_enhanced(site_url: str, page_url: str) -> str:
     """
     Enhanced URL inspection to check indexing status and rich results in Google.
@@ -772,7 +782,7 @@ def _inspect_single_url(site_url: str, page_url: str) -> Dict[str, Any]:
         return {"url": page_url, "error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def batch_url_inspection(site_url: str, urls: str) -> str:
     """
     Inspect multiple URLs in batch (within API limits).
@@ -875,7 +885,7 @@ def _check_indexing_single_url(site_url: str, page_url: str) -> Dict[str, Option
     return result
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def check_indexing_issues(site_url: str, urls: str) -> str:
     """
     Check for specific indexing issues across multiple URLs.
@@ -946,7 +956,7 @@ async def check_indexing_issues(site_url: str, urls: str) -> str:
     except Exception as e:
         return f"Error checking indexing issues: {str(e)}"
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_performance_overview(site_url: str, days: int = 28) -> str:
     """
     Get a performance overview for a specific property.
@@ -1024,7 +1034,7 @@ async def get_performance_overview(site_url: str, days: int = 28) -> str:
             return _site_not_found_error(site_url)
         return f"Error retrieving performance overview: {str(e)}"
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_advanced_search_analytics(
     site_url: str, 
     start_date: str = None, 
@@ -1188,7 +1198,7 @@ async def get_advanced_search_analytics(
             return _site_not_found_error(site_url)
         return f"Error retrieving advanced search analytics: {str(e)}"
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def compare_search_periods(
     site_url: str,
     period1_start: str,
@@ -1334,7 +1344,7 @@ async def compare_search_periods(
             return _site_not_found_error(site_url)
         return f"Error comparing search periods: {str(e)}"
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_search_by_page_query(
     site_url: str,
     page_url: str,
@@ -1417,7 +1427,7 @@ async def get_search_by_page_query(
     except Exception as e:
         return f"Error retrieving page query data: {str(e)}"
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def list_sitemaps_enhanced(site_url: str, sitemap_index: str = None) -> str:
     """
     List all sitemaps for a specific Search Console property with detailed information.
@@ -1485,7 +1495,7 @@ async def list_sitemaps_enhanced(site_url: str, sitemap_index: str = None) -> st
             return _site_not_found_error(site_url)
         return f"Error retrieving sitemaps: {str(e)}"
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_sitemap_details(site_url: str, sitemap_url: str) -> str:
     """
     Get detailed information about a specific sitemap.
@@ -1658,7 +1668,7 @@ async def manage_sitemaps(site_url: str, action: str, sitemap_url: str = None, s
     except Exception as e:
         return f"Error managing sitemaps: {str(e)}"
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_creator_info() -> str:
     """
     Provides information about Amin Foroutan, the creator of the MCP-GSC tool.
